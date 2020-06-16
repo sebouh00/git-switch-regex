@@ -1,0 +1,192 @@
+#!/usr/bin/env bash
+DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+doSomethingWithChoice() {
+	CHOICE="$1"
+	if [ ! -z "${COPY:-}" ]; then
+		printf "$CHOICE" | pbcopy
+		echo "Copied '$CHOICE' to the clipboard"
+	else
+		git switch "$CHOICE"
+	fi
+}
+
+printChoices() {
+	BRANCHES="$1"
+	LOCAL_BRANCHES="${2:-}"
+	PADDING_LEN=`getPaddingLen "$BRANCHES"`
+
+	i=1
+	echo "$BRANCHES" | while read LINE ; do
+		FOUND_LOCAL="true"
+		if [[ ! -z "$LOCAL_BRANCHES" ]]; then
+			echo "$LOCAL_BRANCHES" | grep -i -- "$LINE" > /dev/null 2>&1
+			if [ "$?" != "0" ]; then
+				FOUND_LOCAL="false"
+			fi
+		fi
+
+		if [ "$FOUND_LOCAL" = "true" ]; then
+			printf "%-*s%s\n" "$PADDING_LEN" "[$i]" "$LINE"
+		else
+			printf "\e[1;31m%-*s%s\e[m\n" "$PADDING_LEN" "[$i]" "$LINE"
+		fi
+   		i=$((i+1))
+	done
+}
+
+getPaddingLen() {
+	BRANCHES="$1"
+	MATCH_COUNT_LEN=`echo "$BRANCHES" | wc -l | tr -d ' ' | wc -m | tr -d ' '`
+
+	echo "$(($MATCH_COUNT_LEN + 2))"
+}
+
+pickChoice() {
+	BRANCHES="$1"
+	CHOICE=$2
+
+	i=1
+	echo "$BRANCHES" | while read LINE ; do
+		if [ "$i" = "$CHOICE" ]; then
+			doSomethingWithChoice "$LINE"
+			return
+		fi
+		i=$((i+1))
+	done
+}
+
+askForChoice() {
+	BRANCHES="$1"
+	HIGHLIGHT_REMOTES="$2"
+	COUNT=`echo "$BRANCHES" | wc -l | tr -d ' '`
+
+	if [ "$HIGHLIGHT_REMOTES" = "yes" ]; then
+		LOCAL_BRANCHES=`findMatchingBranches "*" "locals"`
+	fi
+
+	while true
+	do
+		echo ""
+		printChoices "$BRANCHES" "${LOCAL_BRANCHES:=}"
+		echo ""
+		printf "Make your choice: "
+		read CHOICE
+		if [ -z $CHOICE ] || [ "$CHOICE" = "q" ]; then
+			return
+		fi
+
+		if [[ "$CHOICE" =~ ^[0-9]+$ ]]; then
+			if [ "$CHOICE" -gt "0" ] && [ "$CHOICE" -le "$COUNT" ]; then
+				pickChoice "$BRANCHES" $CHOICE
+				return
+			fi
+		fi
+	done
+}
+
+findMatchingBranches() {
+	FILTER="$1"
+	TYPE="$2"
+
+	if [ "$TYPE" = "all" ]; then
+		RESULT=`git branch -a` # remotes only
+	elif [ "$TYPE" = "locals" ]; then
+		RESULT=`git branch` # locals only
+	fi
+	
+	RESULT=`echo "$RESULT" | grep -v "HEAD detached at" | tr -d '* ' | grep -v '\->' | sed -e "s/.*remotes\/origin\///"`
+
+	if [ "$FILTER" != "*" ]; then
+		RESULT=`echo "$RESULT" | grep -Ei -- "$FILTER"`
+	fi
+
+	RESULT=`echo "$RESULT" | awk '!seen[$0]++'`
+
+	echo "$RESULT"
+}
+
+processResult() {
+	BRANCHES="$1"
+	FILTER="$2"
+
+	COUNT=`echo "$BRANCHES" | wc -l | tr -d ' '`
+
+	if [ "1" = "$COUNT" ]; then
+		doSomethingWithChoice "$BRANCHES" # auto-switch to single branch match
+	elif [ "0" != "$COUNT" ]; then
+		askForChoice "$BRANCHES" "yes"
+	fi
+}
+
+showRecentBranches() {
+	ROOT_DIR=`git rev-parse --show-toplevel 2> /dev/null || true`
+	if [ -z "$ROOT_DIR" ]; then
+		return
+	fi
+
+	RECENT_BRANCHES_FILE=$ROOT_DIR/.git/recent-branches
+	if ! test -f $RECENT_BRANCHES_FILE; then
+		echo "No recently switched branches"
+		return 
+	fi
+	
+	COUNT=`cat $RECENT_BRANCHES_FILE | wc -l | tr -d ' '`
+	if [ "$COUNT" == "0" ]; then
+		echo "Recent branch history is empty"
+	else
+		BRANCHES=`cat $RECENT_BRANCHES_FILE`
+		askForChoice "$BRANCHES" "no"
+	fi
+}
+
+printUsage() {
+	# echo ""
+	echo "Usage: `basename $0` [-hc] [filter]"
+	echo ""
+	echo "Switches to the branch matching the specified filter. When more than one match is found,"
+	echo "a choice menu is prompted. If no filter is specified, recently switched branches are"
+	echo "prompted instead. These are retreived from .git/recent-branches. Remote-only branches are"
+	echo "printed in red."
+	echo ""
+	echo "Optional arguments:"
+	echo "-h        Prints this help instruction."
+	echo "-c        Copies the chosen branch name to the clipboard instead of switching to it."
+	echo "[fitler]  A regex used for filtering out branches."
+	echo ""
+}
+
+main() {
+	# parse options
+	OPTIND=1
+	while getopts "hc" OPT; do
+		case "$OPT" in
+			h) HELP=1
+				;;
+			c) COPY=1
+				;;
+		esac
+	done
+	shift $(($OPTIND-1))
+
+	# print usage
+	if [ ! -z "${HELP:-}" ]; then
+		printUsage
+		exit
+	fi
+
+	FILTER="${1:-}"
+	if [ -z "$FILTER" ]; then
+		showRecentBranches
+	else
+		BRANCHES=`findMatchingBranches "$FILTER" "all"`
+		if [ -z "$BRANCHES" ]; then
+			echo "No matches found for '$FILTER'"
+		else
+			processResult "$BRANCHES" "$FILTER"
+		fi
+	fi
+}
+
+set -u
+main $@
