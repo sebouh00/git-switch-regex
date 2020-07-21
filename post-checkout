@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
-ROOT_DIR=`git rev-parse --show-toplevel`
-RECENT_BRANCHES_FILE=$ROOT_DIR/.git/recent-branches
+MAIN_WORKTREE_DIR=`git worktree list | awk 'NR==1{ print $1; exit }'`
+RECENT_BRANCHES_FILE=$MAIN_WORKTREE_DIR/.git/recent-branches
 
 trimRecentBranches() {
 	cat $RECENT_BRANCHES_FILE | awk 'length($0) > 0 && !seen[$0]++ && length(seen) < 21' > "${RECENT_BRANCHES_FILE}.tmp"

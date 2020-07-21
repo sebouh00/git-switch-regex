@@ -1,5 +1,4 @@
 #!/usr/bin/env bash
-DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 doSomethingWithChoice() {
 	CHOICE="$1"
@@ -120,12 +119,12 @@ processResult() {
 }
 
 showRecentBranches() {
-	ROOT_DIR=`git rev-parse --show-toplevel 2> /dev/null || true`
-	if [ -z "$ROOT_DIR" ]; then
+	MAIN_WORKTREE_DIR=`git worktree list | awk 'NR==1{ print $1; exit }' || true`
+	if [ -z "$MAIN_WORKTREE_DIR" ]; then
 		return
 	fi
 
-	RECENT_BRANCHES_FILE=$ROOT_DIR/.git/recent-branches
+	RECENT_BRANCHES_FILE=$MAIN_WORKTREE_DIR/.git/recent-branches
 	if ! test -f $RECENT_BRANCHES_FILE; then
 		echo "No recently switched branches"
 		return 
