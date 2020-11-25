@@ -94,7 +94,7 @@ findMatchingBranches() {
 		RESULT=`git branch` # locals only
 	fi
 	
-	RESULT=`echo "$RESULT" | grep -v "HEAD detached at" | tr -d '* ' | grep -v '\->' | sed -e "s/.*remotes\/origin\///"`
+	RESULT=`echo "$RESULT" | grep -v "HEAD detached at" | tr -d '* ' | tr -d '+ ' | grep -v '\->' | sed -e "s/.*remotes\/origin\///"`
 
 	if [ "$FILTER" != "*" ]; then
 		RESULT=`echo "$RESULT" | grep -Ei -- "$FILTER"`
