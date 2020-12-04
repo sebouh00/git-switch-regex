@@ -118,13 +118,19 @@ processResult() {
 	fi
 }
 
-showRecentBranches() {
-	MAIN_WORKTREE_DIR=`git worktree list | awk 'NR==1{ print $1; exit }' || true`
-	if [ -z "$MAIN_WORKTREE_DIR" ]; then
-		return
-	fi
+getRecentBranchesFile() {
+	local MAIN_WORKTREE_DIR=`git worktree list | awk 'NR==1{ print $1; exit }'`
 
-	RECENT_BRANCHES_FILE=$MAIN_WORKTREE_DIR/.git/recent-branches
+	if test -d $MAIN_WORKTREE_DIR/.git; then
+		echo $MAIN_WORKTREE_DIR"/.git/recent-branches"
+	else
+		echo $MAIN_WORKTREE_DIR"/recent-branches"
+	fi
+}
+
+showRecentBranches() {
+	RECENT_BRANCHES_FILE=`getRecentBranchesFile`
+
 	if ! test -f $RECENT_BRANCHES_FILE; then
 		echo "No recently switched branches"
 		return 

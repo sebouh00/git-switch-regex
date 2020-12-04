@@ -1,7 +1,17 @@
 #!/usr/bin/env bash
 
-MAIN_WORKTREE_DIR=`git worktree list | awk 'NR==1{ print $1; exit }'`
-RECENT_BRANCHES_FILE=$MAIN_WORKTREE_DIR/.git/recent-branches
+# Worktrees share the same recent-branches file, stored under the main worktree's git directory.
+getRecentBranchesFile() {
+	local MAIN_WORKTREE_DIR=`git worktree list | awk 'NR==1{ print $1; exit }'`
+
+	if test -d $MAIN_WORKTREE_DIR/.git; then
+		echo $MAIN_WORKTREE_DIR"/.git/recent-branches"
+	else
+		echo $MAIN_WORKTREE_DIR"/recent-branches"
+	fi
+}
+
+RECENT_BRANCHES_FILE=`getRecentBranchesFile`
 
 trimRecentBranches() {
 	cat $RECENT_BRANCHES_FILE | awk 'length($0) > 0 && !seen[$0]++ && length(seen) < 21' > "${RECENT_BRANCHES_FILE}.tmp"
