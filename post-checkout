@@ -1,8 +1,12 @@
 #!/usr/bin/env bash
 
+getMainWorktreeDir() {
+	echo `git worktree list | awk 'NR==1{ print $1; exit }'`
+}
+
 # Worktrees share the same recent-branches file, stored under the main worktree's git directory.
 getRecentBranchesFile() {
-	local MAIN_WORKTREE_DIR=`git worktree list | awk 'NR==1{ print $1; exit }'`
+	local MAIN_WORKTREE_DIR=`getMainWorktreeDir`
 
 	if test -d $MAIN_WORKTREE_DIR/.git; then
 		echo $MAIN_WORKTREE_DIR"/.git/recent-branches"
@@ -32,4 +36,10 @@ addNewBranch() {
 
 if [[ "$3" = "1" ]]; then
 	addNewBranch &
+fi
+
+# Execute the local post-checkout hook
+LOCAL_HOOK="$(getMainWorktreeDir)/.git/hooks/post-checkout"
+if [ -x $LOCAL_HOOK ]; then
+    $LOCAL_HOOK "$@"
 fi
